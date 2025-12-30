@@ -1,28 +1,22 @@
+import { drizzle } from 'drizzle-orm/bun-sqlite'
+import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import { Database } from 'bun:sqlite'
-import { readFileSync } from 'fs'
-import { join } from 'path'
 
-const db = new Database('./data.db')
+const sqlite = new Database('./data.db')
+const db = drizzle(sqlite)
 
-// Read and execute the migration SQL
-const migrationSQL = readFileSync(join(import.meta.dir, '../drizzle/0000_mysterious_dark_phoenix.sql'), 'utf-8')
+console.log('🔄 Running database migrations...')
 
-// Split by semicolons and execute each statement
-const statements = migrationSQL
-    .split(';')
-    .map(s => s.trim())
-    .filter(s => s.length > 0)
-
-console.log('🔄 Running migrations...')
-
-for (const statement of statements) {
-    try {
-        db.run(statement)
-    } catch (error) {
-        console.error('Error executing statement:', statement)
-        throw error
-    }
+try {
+    // Drizzle's migrate function automatically:
+    // 1. Creates __drizzle_migrations table to track executed migrations
+    // 2. Only runs migrations that haven't been executed yet
+    // 3. Executes migrations in order
+    migrate(db, { migrationsFolder: './drizzle' })
+    console.log('✅ Database migrations completed successfully!')
+} catch (error) {
+    console.error('❌ Migration failed:', error)
+    process.exit(1)
+} finally {
+    sqlite.close()
 }
-
-console.log('✅ Migrations completed successfully!')
-db.close()

@@ -14,6 +14,7 @@ export const products = sqliteTable('products', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
   price: real('price').notNull(),
+  img: text('img'), // Product image URL (nullable)
   limit: integer('limit'), // Purchase limit per order (nullable)
   stock: integer('stock').default(999), // Available stock
   createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
