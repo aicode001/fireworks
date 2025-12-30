@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
+import { API_BASE_URL } from '../config/api'
 
-const API_URL = 'http://localhost:3000'
+const API_URL = API_BASE_URL
 
 export default function ProductManagement({ token }) {
     const [products, setProducts] = useState([])

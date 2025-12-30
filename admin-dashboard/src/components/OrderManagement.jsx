@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
+import { API_BASE_URL } from '../config/api'
 
-const API_URL = 'http://localhost:3000'
+const API_URL = API_BASE_URL
 
 const statusColors = {
     pending: 'bg-yellow-100 text-yellow-800',
@@ -139,8 +140,8 @@ export default function OrderManagement({ token }) {
                                                 key={status}
                                                 onClick={() => updateOrderStatus(orderDetails.order.id, status)}
                                                 className={`px-3 py-1 text-xs font-medium rounded-full transition ${orderDetails.order.status === status
-                                                        ? statusColors[status]
-                                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                    ? statusColors[status]
+                                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                                     }`}
                                             >
                                                 {label}
