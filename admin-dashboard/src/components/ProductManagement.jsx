@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { API_BASE_URL } from '../config/api'
 
 const API_URL = API_BASE_URL
@@ -8,9 +8,12 @@ export default function ProductManagement({ token }) {
     const [loading, setLoading] = useState(true)
     const [showModal, setShowModal] = useState(false)
     const [editingProduct, setEditingProduct] = useState(null)
+    const [uploading, setUploading] = useState(false)
+    const fileInputRef = useRef(null)
     const [formData, setFormData] = useState({
         name: '',
         price: '',
+        img: '',
         limit: '',
         stock: ''
     })
@@ -31,6 +34,49 @@ export default function ProductManagement({ token }) {
         }
     }
 
+    const handleImageUpload = async (e) => {
+        const file = e.target.files[0]
+        if (!file) return
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            alert('请选择图片文件')
+            return
+        }
+
+        // Validate file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('图片大小不能超过5MB')
+            return
+        }
+
+        setUploading(true)
+        try {
+            const uploadData = new FormData()
+            uploadData.append('file', file)
+
+            const response = await fetch(`${API_URL}/api/upload`, {
+                method: 'POST',
+                body: uploadData
+            })
+
+            const result = await response.json()
+
+            if (result.success) {
+                // Build full URL for the image
+                const imgUrl = `${API_URL}${result.url}`
+                setFormData({ ...formData, img: imgUrl })
+            } else {
+                alert(result.message || '上传失败')
+            }
+        } catch (error) {
+            console.error('Upload failed:', error)
+            alert('上传失败，请重试')
+        } finally {
+            setUploading(false)
+        }
+    }
+
     const handleSubmit = async (e) => {
         e.preventDefault()
 
@@ -38,6 +84,7 @@ export default function ProductManagement({ token }) {
             name: formData.name,
             price: parseFloat(formData.price),
             stock: parseInt(formData.stock),
+            ...(formData.img && { img: formData.img }),
             ...(formData.limit && { limit: parseInt(formData.limit) })
         }
 
@@ -82,12 +129,13 @@ export default function ProductManagement({ token }) {
             setFormData({
                 name: product.name,
                 price: product.price.toString(),
+                img: product.img || '',
                 limit: product.limit?.toString() || '',
                 stock: product.stock.toString()
             })
         } else {
             setEditingProduct(null)
-            setFormData({ name: '', price: '', limit: '', stock: '' })
+            setFormData({ name: '', price: '', img: '', limit: '', stock: '' })
         }
         setShowModal(true)
     }
@@ -95,7 +143,17 @@ export default function ProductManagement({ token }) {
     const closeModal = () => {
         setShowModal(false)
         setEditingProduct(null)
-        setFormData({ name: '', price: '', limit: '', stock: '' })
+        setFormData({ name: '', price: '', img: '', limit: '', stock: '' })
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ''
+        }
+    }
+
+    const clearImage = () => {
+        setFormData({ ...formData, img: '' })
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ''
+        }
     }
 
     if (loading) {
@@ -119,6 +177,7 @@ export default function ProductManagement({ token }) {
                     <thead className="bg-gray-50">
                         <tr>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">图片</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">商品名称</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">价格</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">限购</th>
@@ -130,6 +189,18 @@ export default function ProductManagement({ token }) {
                         {products.map((product) => (
                             <tr key={product.id} className="hover:bg-gray-50">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{product.id}</td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    {product.img ? (
+                                        <img
+                                            src={product.img}
+                                            alt={product.name}
+                                            className="w-12 h-12 object-cover rounded border border-gray-200"
+                                            onError={(e) => e.target.src = 'https://via.placeholder.com/48?text=无图片'}
+                                        />
+                                    ) : (
+                                        <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400">无图片</div>
+                                    )}
+                                </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{product.name}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-semibold">¥{product.price}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{product.limit || '-'}</td>
@@ -157,7 +228,7 @@ export default function ProductManagement({ token }) {
             {/* Modal */}
             {showModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                    <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
                         <h3 className="text-xl font-bold mb-4">
                             {editingProduct ? '编辑商品' : '添加商品'}
                         </h3>
@@ -182,6 +253,74 @@ export default function ProductManagement({ token }) {
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
                                     required
                                 />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">商品图片</label>
+
+                                {/* Image Preview */}
+                                {formData.img && (
+                                    <div className="mb-3 relative inline-block">
+                                        <img
+                                            src={formData.img}
+                                            alt="预览"
+                                            className="w-32 h-32 object-cover rounded-lg border border-gray-200"
+                                            onError={(e) => e.target.src = 'https://via.placeholder.com/128?text=图片加载失败'}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={clearImage}
+                                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-sm hover:bg-red-600"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Upload Button */}
+                                <div className="flex items-center gap-3">
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        accept="image/*"
+                                        onChange={handleImageUpload}
+                                        className="hidden"
+                                        id="image-upload"
+                                    />
+                                    <label
+                                        htmlFor="image-upload"
+                                        className={`px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition inline-flex items-center gap-2 ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    >
+                                        {uploading ? (
+                                            <>
+                                                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                                </svg>
+                                                上传中...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                                选择图片
+                                            </>
+                                        )}
+                                    </label>
+                                    <span className="text-xs text-gray-400">支持 JPG、PNG、GIF，最大 5MB</span>
+                                </div>
+
+                                {/* Or enter URL manually */}
+                                <div className="mt-3">
+                                    <label className="block text-xs text-gray-500 mb-1">或输入图片URL</label>
+                                    <input
+                                        type="url"
+                                        value={formData.img}
+                                        onChange={(e) => setFormData({ ...formData, img: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none text-sm"
+                                        placeholder="https://example.com/image.jpg"
+                                    />
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">限购数量（可选）</label>

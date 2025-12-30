@@ -3,31 +3,13 @@ import { html } from '@elysiajs/html'
 import { swagger } from '@elysiajs/swagger'
 import { cors } from '@elysiajs/cors'
 import { jwt } from '@elysiajs/jwt'
-import { staticPlugin } from '@elysiajs/static'
 import { db } from './db'
 import { users, products, orders, orderItems } from './db/schema'
 import { eq } from 'drizzle-orm'
-import { mkdir, writeFile } from 'fs/promises'
-import { existsSync } from 'fs'
-import { join, isAbsolute } from 'path'
-import { config } from './config'
-
-// Ensure image directory exists (支持绝对路径和相对路径)
-const imgDir = isAbsolute(config.imagePath)
-    ? config.imagePath
-    : join(import.meta.dir, config.imagePath)
-
-if (!existsSync(imgDir)) {
-    await mkdir(imgDir, { recursive: true })
-}
 
 const app = new Elysia()
     .use(cors())
     .use(html())
-    .use(staticPlugin({
-        assets: config.imagePath,
-        prefix: config.imageUrlPrefix
-    }))
     .use(swagger({
         path: '/swagger',
         documentation: {
@@ -39,14 +21,13 @@ const app = new Elysia()
             tags: [
                 { name: 'Products', description: '商品相关接口' },
                 { name: 'Orders', description: '订单相关接口' },
-                { name: 'Admin', description: '管理员接口' },
-                { name: 'Upload', description: '文件上传接口' }
+                { name: 'Admin', description: '管理员接口' }
             ]
         }
     }))
     .use(jwt({
         name: 'jwt',
-        secret: config.jwtSecret
+        secret: 'your-secret-key-change-in-production'
     }))
 
     // ============ Shop Frontend ============
@@ -69,26 +50,14 @@ const app = new Elysia()
     <!-- 列表 -->
     <div class="p-4 space-y-4">
         <template x-for="item in products" :key="item.id">
-            <div class="bg-white p-4 rounded-xl shadow-sm flex gap-4 items-center">
-                <!-- Product Image -->
-                <div class="flex-shrink-0">
-                    <img 
-                        :src="item.img || 'https://via.placeholder.com/80x80?text=暂无图片'" 
-                        :alt="item.name"
-                        class="w-20 h-20 object-cover rounded-lg border border-gray-200"
-                        @error="$el.src='https://via.placeholder.com/80x80?text=暂无图片'">
-                </div>
-                
-                <!-- Product Info -->
-                <div class="flex-grow">
+            <div class="bg-white p-4 rounded-xl shadow-sm flex justify-between items-center">
+                <div>
                     <h3 class="font-bold text-lg text-gray-800" x-text="item.name"></h3>
                     <p class="text-red-500 font-semibold">¥<span x-text="item.price"></span></p>
                     <p x-show="item.limit" class="text-xs text-gray-400" x-text="'限购' + item.limit + '单'"></p>
                     <p class="text-xs text-gray-500" x-text="'库存: ' + item.stock"></p>
                 </div>
-                
-                <!-- Add/Remove Buttons -->
-                <div class="flex items-center gap-3 flex-shrink-0">
+                <div class="flex items-center gap-3">
                     <button @click="minus(item)" class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xl font-bold">-</button>
                     <span class="w-4 text-center font-bold" x-text="cart[item.id] || 0"></span>
                     <button @click="plus(item)" class="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center text-xl font-bold">+</button>
@@ -213,46 +182,6 @@ const app = new Elysia()
         })
     })
 
-    // ============ Image Upload API ============
-    .post('/api/upload', async ({ body }) => {
-        try {
-            const file = body.file
-            if (!file) {
-                return { success: false, message: '请选择文件' }
-            }
-
-            // Generate unique filename
-            const timestamp = Date.now()
-            const originalName = file.name
-            const ext = originalName.substring(originalName.lastIndexOf('.'))
-            const filename = `${timestamp}${ext}`
-
-            // Save file to img directory
-            const filepath = join(imgDir, filename)
-            const arrayBuffer = await file.arrayBuffer()
-            await writeFile(filepath, Buffer.from(arrayBuffer))
-
-            // Return the URL path
-            const imgUrl = `${config.imageUrlPrefix}/${filename}`
-
-            return {
-                success: true,
-                message: '上传成功',
-                url: imgUrl,
-                filename: filename
-            }
-        } catch (error) {
-            console.error('Upload error:', error)
-            return { success: false, message: '上传失败' }
-        }
-    }, {
-        body: t.Object({
-            file: t.File({
-                type: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
-            })
-        })
-    })
-
     // Admin Login
     .post('/api/admin/login', async ({ body, jwt }) => {
         try {
@@ -328,7 +257,6 @@ const app = new Elysia()
         body: t.Object({
             name: t.String(),
             price: t.Number(),
-            img: t.Optional(t.String()),
             limit: t.Optional(t.Number()),
             stock: t.Number()
         })
@@ -345,7 +273,6 @@ const app = new Elysia()
         body: t.Object({
             name: t.String(),
             price: t.Number(),
-            img: t.Optional(t.String()),
             limit: t.Optional(t.Number()),
             stock: t.Number()
         })
@@ -358,8 +285,7 @@ const app = new Elysia()
         return { success: true }
     })
 
-    .listen(config.port)
+    .listen(3000)
 
-console.log(`🚀 烟花App运行在: http://localhost:${config.port}`)
-console.log(`📚 API文档: http://localhost:${config.port}/swagger`)
-console.log('🖼️ 图片目录: ' + imgDir)
+console.log('🚀 烟花App运行在: http://localhost:3000')
+console.log('📚 API文档: http://localhost:3000/swagger')
